@@ -1,0 +1,15 @@
+  STSW-ROBOT-1
+  Release note
+  
+  Revision 1.1
+    - Updated to MCSDK 5.4.4 revision
+	- Fixed a bug causing the motor lock if a failure occurs during initial alignment procedure
+	- Fixed a bug causing the command state machine failure if a motion command with target duration 
+	  equal to zero is requested 
+  Revision 1
+	First Release
+  
+  This software component is licensed by ST under Ultimate Liberty license SLA0044, the "License"; 
+  You may not use this file except in compliance with the License. 
+  You may obtain a copy of the License at:
+                               www.st.com/SLA0044
