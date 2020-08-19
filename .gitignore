@@ -1,5 +1,18 @@
+.DS_Store
+
 # Prerequisites
 *.d
+
+# Assembly
+*.s
+*.icf
+
+# Project
+*.ioc
+*.ioc.wb
+
+# Logs
+*.log
 
 # Object files
 *.o
