@@ -1,5 +1,12 @@
 .DS_Store
 
+# Ignore folders
+Binary/*
+EVALKIT_ROBOT_1_SDK544_Positioning_LL/Drivers/*
+EVALKIT_ROBOT_1_SDK544_Positioning_LL/EWARM/*
+EVALKIT_ROBOT_1_SDK544_Positioning_LL/MDK-ARM/*
+EVALKIT_ROBOT_1_SDK544_Positioning_LL/STM32CubeIDE/*
+
 # Prerequisites
 *.d
 
