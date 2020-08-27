@@ -85,8 +85,10 @@ typedef struct
 /* Exported functions ------------------------------------------------------- */
 void MCI_Init( MCI_Handle_t * pHandle, STM_Handle_t * pSTM, SpeednTorqCtrl_Handle_t * pSTC, pFOCVars_t pFOCVars, PosCtrl_Handle_t * pPosCtrl );
 void MCI_ExecPositionCommand( MCI_Handle_t * pHandle, float FinalPosition, float Duration );
+void MCI_ExecDriveCommand( MCI_Handle_t * pHandle, int16_t speed, uint16_t rampDurationms, STC_Modality_t controlMode );
 PosCtrlStatus_t MCI_GetCtrlPositionState( MCI_Handle_t * pHandle );
 AlignStatus_t  MCI_GetAlignmentStatus( MCI_Handle_t * pHandle );
+float MCI_GetPositionRef( MCI_Handle_t * pHandle );
 float MCI_GetCurrentPosition( MCI_Handle_t * pHandle );
 float MCI_GetTargetPosition( MCI_Handle_t * pHandle );
 float MCI_GetMoveDuration( MCI_Handle_t * pHandle );
@@ -105,7 +107,8 @@ uint16_t MCI_GetOccurredFaults( MCI_Handle_t * pHandle );
 uint16_t MCI_GetCurrentFaults( MCI_Handle_t * pHandle );
 int16_t MCI_GetMecSpeedRefUnit( MCI_Handle_t * pHandle );
 int16_t MCI_GetAvrgMecSpeedUnit( MCI_Handle_t * pHandle );
-/*int16_t MCI_GetTorque( MCI_Handle_t * pHandle );*/
+int16_t MCI_GetTorqueRef( MCI_Handle_t * pHandle );
+qd_t MCI_GetDefaultIqdref( MCI_Handle_t * pHandle ) ;
 int16_t MCI_GetPhaseCurrentAmplitude( MCI_Handle_t * pHandle );
 int16_t MCI_GetPhaseVoltageAmplitude( MCI_Handle_t * pHandle );
 STC_Modality_t MCI_GetControlMode( MCI_Handle_t * pHandle );

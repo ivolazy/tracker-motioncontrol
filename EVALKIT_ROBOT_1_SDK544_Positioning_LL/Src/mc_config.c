@@ -136,12 +136,12 @@ SpeednTorqCtrl_Handle_t SpeednTorqCtrlM1 =
   .MinAppPositiveMecSpeedUnit =	(uint16_t)(MIN_APPLICATION_SPEED_UNIT), 
   .MaxAppNegativeMecSpeedUnit =	(int16_t)(-MIN_APPLICATION_SPEED_UNIT), 
   .MinAppNegativeMecSpeedUnit =	(int16_t)(-MAX_APPLICATION_SPEED_UNIT),
-  .MaxPositiveTorque =				(int16_t)NOMINAL_CURRENT,		 
-  .MinNegativeTorque =				-(int16_t)NOMINAL_CURRENT,       
-  .ModeDefault =					DEFAULT_CONTROL_MODE,            
+  .MaxPositiveTorque =		        (int16_t)NOMINAL_CURRENT,		 
+  .MinNegativeTorque =			-(int16_t)NOMINAL_CURRENT,       
+  .ModeDefault =			DEFAULT_CONTROL_MODE,            
   .MecSpeedRefUnitDefault =		(int16_t)(DEFAULT_TARGET_SPEED_UNIT),
-  .TorqueRefDefault =				(int16_t)DEFAULT_TORQUE_COMPONENT,
-  .IdrefDefault =					(int16_t)DEFAULT_FLUX_COMPONENT,                                                                     
+  .TorqueRefDefault =			(int16_t)DEFAULT_TORQUE_COMPONENT,
+  .IdrefDefault =			(int16_t)DEFAULT_FLUX_COMPONENT,                                                                     
 };
 PWMC_R3_1_Handle_t PWM_Handle_M1 =
 {

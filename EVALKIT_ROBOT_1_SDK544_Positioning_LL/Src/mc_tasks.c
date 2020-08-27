@@ -506,7 +506,7 @@ __weak void TSK_MediumFrequencyTaskM1(void)
 
     /* USER CODE END MediumFrequencyTask M1 2 */
 
-    TC_PositionRegulation(pPosCtrl[M1]);
+    TC_PositionRegulation(pPosCtrl[M1]); 
 
     MCI_ExecBufferedCommands( oMCInterface[M1] );
     FOC_CalcCurrRef( M1 );

@@ -42,6 +42,7 @@ extern "C" {
 
 #define Z_ALIGNMENT_DURATION	2	                    /* 2 seconds */
 #define Z_ALIGNMENT_NB_ROTATION	(2.0f * M_PI)	        /* 1 turn in 2 seconds allowed to find the "Z" signal  */
+#define RAMP_SECONDS_PER_ROTATION      (1.0f / 20.0f)   /* Eg. 1 second to go from 0 to 20 rotations */
 
 /** @addtogroup MCSDK
   * @{
@@ -55,7 +56,8 @@ typedef enum {
     TC_READY_FOR_COMMAND  = 0,
     TC_MOVEMENT_ON_GOING = 1,
     TC_TARGET_POSITION_REACHED = 2,
-    TC_FOLLOWING_ON_GOING = 3
+    TC_FOLLOWING_ON_GOING = 3,
+    TC_DRIVE_ON_GOING = 4
 } PosCtrlStatus_t;
 
 typedef enum {
@@ -73,6 +75,7 @@ typedef enum {
   */
 typedef struct
 {
+  float RampDuration;
   float MovementDuration;
   float StartingAngle;
   float FinalAngle;
@@ -106,13 +109,16 @@ typedef struct
 
 void TC_Init(PosCtrl_Handle_t *pHandle, PID_Handle_t * pPIDPosReg, SpeednTorqCtrl_Handle_t * pSTC, ENCODER_Handle_t * pENC);
 bool TC_MoveCommand  (PosCtrl_Handle_t *pHandle, float startingAngle, float angleStep, float movementDuration);
+bool TC_DriveCommand  (PosCtrl_Handle_t *pHandle, int16_t speed, uint16_t rampDurationms);
 void TC_FollowCommand(PosCtrl_Handle_t *pHandle, float Angle);
 void TC_PositionRegulation(PosCtrl_Handle_t *pHandle);
 void TC_MoveExecution  (PosCtrl_Handle_t *pHandle);
+void TC_DriveExecution  (PosCtrl_Handle_t *pHandle);
 void TC_FollowExecution(PosCtrl_Handle_t *pHandle);
 void TC_EncAlignmentCommand(PosCtrl_Handle_t *pHandle);
 bool TC_RampCompleted(PosCtrl_Handle_t *pHandle);
 void TC_EncoderReset(PosCtrl_Handle_t *pHandle);
+float TC_GetPositionRef(PosCtrl_Handle_t *pHandle);
 float TC_GetCurrentPosition(PosCtrl_Handle_t *pHandle);
 float TC_GetTargetPosition(PosCtrl_Handle_t *pHandle);
 float TC_GetMoveDuration(PosCtrl_Handle_t *pHandle);

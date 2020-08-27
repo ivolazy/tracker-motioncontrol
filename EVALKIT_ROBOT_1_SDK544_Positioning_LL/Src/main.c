@@ -21,10 +21,13 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "motorcontrol.h"
+#include "mc_parameters.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "mc_api.h"
+#include "mc_config.h"
+#include "mc_interface.h"
 #include "mb.h"
 #include "mb_API.h"
 /* USER CODE END Includes */
@@ -53,6 +56,7 @@ typedef enum {
 float fTargetPos=0;
 float movementDuration_s = 2;
 int32_t targetDeg=0;
+int32_t targetSpeed=0;
 
 comState_t comState;
 /* USER CODE END PV */
@@ -79,6 +83,21 @@ bool isMovementComplete()
 {
  return (MC_GetControlPositionStatusMotor1() == TC_READY_FOR_COMMAND);
 }
+
+void signalLEDHelpSOS()
+{
+  for (int i=0; i<3; i++) 
+  { 
+    for (int j=0; j<3; j++) 
+    {
+      LL_GPIO_SetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-on LED
+      HAL_Delay(250 * (2 - i%2));
+      LL_GPIO_ResetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-off LED
+      HAL_Delay(250 * (2 - i%2));
+    }
+  }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -126,24 +145,20 @@ int main(void)
   
   ModbusRTUTask();
   
+  // Motor Alignment
   setZeroReached(0); // Slave indicate that the alignment is not completed
-    
-  LL_GPIO_SetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-on LED
   MC_StartMotor1();
   while(MC_GetAlignmentStatusMotor1() != TC_ALIGNMENT_COMPLETED) 
   {
     if (MC_GetOccurredFaultsMotor1() != 0)
     {
+      signalLEDHelpSOS();
       MC_AcknowledgeFaultMotor1();
-      LL_GPIO_ResetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-off LED
-      HAL_Delay(500);
       MC_StartMotor1();
-      LL_GPIO_SetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-on LED
-      HAL_Delay(500);
     }
   } //  PAUSE THE MAIN LOOP UNTIL THE ENCODER IS ALIGNED
-  
   HAL_Delay(100);
+  //MC_StopMotor1();
   setZeroReached(1);
   
   LL_GPIO_ResetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-off LED
@@ -151,81 +166,165 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
+  while (42)
   {
-    
     /* USER CODE END WHILE */
-
+    
     /* USER CODE BEGIN 3 */
+    
+    // Update the MODBUS registers
+    setMotorDetails(RealBusVoltageSensorParamsM1._Super.AvBusVoltage_d,
+                     (int32_t) (MC_GetCurrentPosition1() * 180 / (float) M_PI),
+                     (int32_t) (MC_GetPositionRef1() * 180 / (float) M_PI),
+                     MC_GetMecSpeedReferenceMotor1(),
+                     MC_GetMecSpeedAverageMotor1(),
+                     MC_GetTorqueRefMotor1(), 
+                     MC_GetDefaultIqdrefMotor1(),
+                     MC_GetPhaseCurrentAmplitudeMotor1(), 
+                     MC_GetPhaseVoltageAmplitudeMotor1(),
+                     MC_GetIabMotor1(), 
+                     MC_GetIalphabetaMotor1(),
+                     MC_GetIqdMotor1(),
+                     MC_GetIqdrefMotor1(),
+                     MC_GetVqdMotor1(),
+                     MC_GetValphabetaMotor1(),
+                     MC_GetElAngledppMotor1(),
+                     MC_GetTerefMotor1());
+    
+    // Check for Motor Errors
     if (MC_GetOccurredFaultsMotor1() != 0)
     {
-      LL_GPIO_SetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-on LED
+      signalLEDHelpSOS();
       setMovementCompleted(1); // Slave indicate that the movement is aborted
       clearCommand();
       MC_AcknowledgeFaultMotor1();
       comState = idle;
     }
-    else
-    {
-      LL_GPIO_ResetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-off LED
-    }
     
     switch (comState) {
     case idle:
       {
-        if(getNewCommand()) // If new command arrived
+        // Check if there is a Position Command
+        if(getNewCommand(0)) // If new position command arrived
         {
+          if (! isMovementComplete()) // If the previous movement has not been completed stop the motor
+          {
+            MC_StopMotor1();
+            HAL_Delay(100);
+            MC_StartMotor1();
+            HAL_Delay(100);
+          }
+
           setMovementCompleted(0); // Slave indicate that the movement is not completed
+          LL_GPIO_SetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-on LED
           targetDeg = getTargetPos_Deg();
           fTargetPos = ((float)(targetDeg) * (float)(M_PI)) / 180.0f;
-          movementDuration_s = getMovementDuration_s();
-          if (movementDuration_s > 0)
+          float duration = 1.0f * getMovementDuration_s();
+          if (duration > 0)
           {
-            MC_ProgramPositionCommandMotor1(fTargetPos, movementDuration_s); // Send command
-            comState = commandReceived;
+            MC_ProgramPositionCommandMotor1(fTargetPos, duration); // Send command
           }
-          else
-          {
-            comState = commandExecuted; // Abort
-          }
+          clearCommand();
         }
-      }
-      break;
-      
-    case commandReceived:
-      {
+
+        // Check if there is a Speed Ramp Command
+        if(getNewCommand(1)) // If new command arrived
+        {
+          setMovementCompleted(0); // Slave indicate that the movement is not completed
+          LL_GPIO_SetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-on LED
+          targetSpeed = getTargetSpeed();
+          float ramp_s = getMovementDuration_s();
+          if (targetSpeed != 0)
+          {
+            //MC_StopMotor1();
+            //HAL_Delay(500);
+            MC_ProgramSpeedRampMotor1((int16_t) targetSpeed, (int) ramp_s * 1000); // Send command
+            MCI_CommandState_t t = MC_GetCommandStateMotor1();
+            //MC_ProgramPositionCommandMotor1(fTargetPos, 0); // Send command
+            //MC_StartMotor1();
+          }
+          else 
+          {
+            MC_StopMotor1();
+          }
+
+          clearCommand();
+        }
+        
+        // Check if there is a Drive Command
+        if(getNewCommand(2)) // If new command arrived
+        {
+          setMovementCompleted(0); // Slave indicate that the movement is not completed
+          LL_GPIO_SetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-on LED
+          int16_t targetSpeed = (int16_t) getTargetSpeed();
+          int16_t rampDuration = (int16_t) getMovementDuration_s(); // REMOVE THIS AFTER you calc the ramp automatically
+          STC_Modality_t controlMode = getControlMode();
+          MC_StartMotor1();
+          MC_ProgramDriveCommandMotor1(targetSpeed, rampDuration, controlMode); // Send command
+          clearCommand();
+        }
+        
+        // Check if there is a Torque Ramp Command
+        if(getNewCommand(3)) // If new command arrived
+        {
+          setMovementCompleted(0); // Slave indicate that the movement is not completed
+          LL_GPIO_SetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-on LED
+          targetSpeed = getTargetSpeed();
+          float ramp_s = getMovementDuration_s();
+          if (targetSpeed != 0)
+          {
+            //MC_StopMotor1();
+            //HAL_Delay(500);
+            MC_ProgramTorqueRampMotor1((int16_t) targetSpeed, (int) ramp_s * 1000); // Send command
+            MCI_CommandState_t t = MC_GetCommandStateMotor1();
+            //MC_ProgramPositionCommandMotor1(fTargetPos, 0); // Send command
+            //MC_StartMotor1();
+          }
+          else 
+          {
+            MC_StopMotor1();
+          }
+
+          clearCommand();
+        }
+        
+        // Check if there is a SOS Command
+        if(getNewCommand(4)) // If new command arrived
+        {
+          signalLEDHelpSOS();
+          clearCommand();
+        }
+        
+        // Check if there is a Start Motor Command
+        if(getNewCommand(5)) // If new command arrived
+        {
+          MC_StartMotor1();
+          clearCommand();
+        }       
+                
+        // Check if there is a Stop Motor Command
+        if(getNewCommand(6)) // If new command arrived
+        {
+          MC_StopMotor1();
+          clearCommand();
+        }
+        
+        // Check if there is a Reset Command
+        if(getNewCommand(7)) // If new command arrived
+        {
+          HAL_NVIC_SystemReset();
+          clearCommand();
+        }
+
         if (isMovementComplete()) // If the movement has been completed
         {
           setMovementCompleted(1); // Slave indicate that the movement is completed
-          comState = commandExecuted;
+          LL_GPIO_ResetOutputPin(LED_GPIO_Port, LED_Pin); // Turn-off LED
         }
-      }
-      break;
-      
-    case commandExecuted:
-      {
-        clearCommand();
-        comState = idle;
-      }
-      break;
-      
-    }
 
-/* ---------------------- DEMO ----------------------- */
-//    if (isMovementComplete())
-//    {
-//      if (fTargetPos == 0)
-//      {
-//        fTargetPos = ((float)(3*360) * (float)(M_PI)) / 180.0f;
-//      }
-//      else
-//      {
-//        fTargetPos = 0;
-//      }
-//      MC_ProgramPositionCommandMotor1(fTargetPos, 1);
-//    }
-/* --------------------------------------------------- */
-    
+      }
+      break; 
+    }
   }
   /* USER CODE END 3 */
 }

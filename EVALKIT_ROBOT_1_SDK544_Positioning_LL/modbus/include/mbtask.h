@@ -8,7 +8,7 @@ PR_BEGIN_EXTERN_C
 
 #include "port.h"
 
-#define MB_SLAVE_ADDRESS 1
+#define MB_SLAVE_ADDRESS        2
 
 /*      NOT USED        */
 #define REG_INPUT_START         1 
@@ -16,7 +16,7 @@ PR_BEGIN_EXTERN_C
 /*      NOT USED        */
 
 #define REG_HOLDING_START       1
-#define REG_HOLDING_NREGS       3
+#define REG_HOLDING_NREGS       64
 
 
 #define REG_COILS_START         1

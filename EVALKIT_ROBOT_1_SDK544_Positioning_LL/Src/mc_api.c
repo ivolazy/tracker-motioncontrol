@@ -191,6 +191,34 @@ __weak void MC_ProgramPositionCommandMotor1( float fTargetPosition, float fDurat
 }
 
 /**
+  * @brief Programs a position command for Motor 1 for later or immediate execution.
+  *
+  *  A position command allows to program a specific movement from current position to
+  *  the @p fTargetPosition target mechanical angle reference in the given @p fDuration time. 
+  *
+  *  Invoking the MC_ProgramPositionCommandMotor1() function programs a target position
+  * with the provided parameters. The programmed position is executed immediately if
+  * there is no movement ongoing.
+  *
+  *  The Application can check the status of the control with the MC_GetControlPositionStatusMotor1()
+  * to know whether the motor is ready to execute a new command or not.
+  *
+  * @note when the duration is set to 0, the input target position is immediately executed.
+  * By calling repeatedly the command with an update of input target angle, the control will be in follow mode.
+  * 
+  * 
+  * @param  fTargetPosition Target mechanical angle reference at the end of the movement.
+  *         This value represents the final position expressed in radian.
+  * @param  angle of the movement expressed in radians.
+  * @param  speed of the movement expressed in SPEED_UNITs
+  * @param  rampDuration duration tor each of the ramps expressed in milliseconds
+  */
+__weak void MC_ProgramDriveCommandMotor1( int16_t speed, uint16_t rampDurationms, STC_Modality_t controlMode )
+{
+	MCI_ExecDriveCommand( pMCI[M1], speed, rampDurationms, controlMode );
+}
+
+/**
   * @brief Programs the current reference to Motor 1 for later or immediate execution.
   *
   *  The current reference to consider is made of the Id and Iq current components. 
@@ -316,6 +344,22 @@ __weak int16_t MC_GetImposedDirectionMotor1(void)
 __weak bool MC_GetSpeedSensorReliabilityMotor1(void)
 {
 	return MCI_GetSpdSensorReliability( pMCI[M1] );
+}
+
+/** 
+ * @brief Returns the torque reference for Motor 1 
+ */
+__weak int16_t MC_GetTorqueRefMotor1(void)
+{
+	return MCI_GetTorqueRef( pMCI[M1] );
+}
+
+/** 
+ * @brief Returns the default torque and Id reference for Motor 1 
+ */
+__weak qd_t MC_GetDefaultIqdrefMotor1(void)
+{
+	return MCI_GetDefaultIqdref( pMCI[M1] );
 }
 
 /** 
@@ -527,6 +571,14 @@ __weak PosCtrlStatus_t  MC_GetControlPositionStatusMotor1( void )
 __weak AlignStatus_t  MC_GetAlignmentStatusMotor1( void )
 {
 	return MCI_GetAlignmentStatus( pMCI[M1] );
+}
+
+/**
+ * @brief returns the refernce position of Motor 1.
+ *   */
+__weak float MC_GetPositionRef1( void )
+{
+	return MCI_GetPositionRef( pMCI[M1] );
 }
 
 /**

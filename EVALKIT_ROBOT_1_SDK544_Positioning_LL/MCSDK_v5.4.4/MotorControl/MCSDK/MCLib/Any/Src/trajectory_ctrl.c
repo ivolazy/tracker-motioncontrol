@@ -23,7 +23,6 @@
 #include "trajectory_ctrl.h"
 #include "speed_pos_fdbk.h"
 
-
 /**
   * @brief  It initializes the static variables used by the position control modes.
   * @param  pHandle: handler of the current instance of the Position Control component.
@@ -104,6 +103,7 @@ bool TC_MoveCommand(PosCtrl_Handle_t *pHandle, float startingAngle, float angleS
 
     // SubStep duration = DeltaT/9  (DeltaT represents the total duration of the programmed movement)
     pHandle->SubStepDuration = pHandle->MovementDuration / 9.0f;
+    //if (pHandle->SubStepDuration > MAX_RAMP_TIME_SECONDS / 3.0f) pHandle->SubStepDuration = MAX_RAMP_TIME_SECONDS / 3.0f;
 
     // Sub step of acceleration phase
     pHandle->SubStep[0] = 1 * pHandle->SubStepDuration;   /* Sub-step 1 of acceleration phase */
@@ -111,16 +111,16 @@ bool TC_MoveCommand(PosCtrl_Handle_t *pHandle, float startingAngle, float angleS
     pHandle->SubStep[2] = 3 * pHandle->SubStepDuration;   /* Sub-step 3 of acceleration phase */
 
     // Sub step of  deceleration Phase
-    pHandle->SubStep[3] = 6 * pHandle->SubStepDuration;   /* Sub-step 1 of deceleration phase */
-    pHandle->SubStep[4] = 7 * pHandle->SubStepDuration;   /* Sub-step 2 of deceleration phase */
-    pHandle->SubStep[5] = 8 * pHandle->SubStepDuration;   /* Sub-step 3 of deceleration phase */
+    pHandle->SubStep[3] = pHandle->MovementDuration - 3 * pHandle->SubStepDuration;   /* Sub-step 1 of deceleration phase */
+    pHandle->SubStep[4] = pHandle->MovementDuration - 2 * pHandle->SubStepDuration;   /* Sub-step 2 of deceleration phase */
+    pHandle->SubStep[5] = pHandle->MovementDuration - 1 * pHandle->SubStepDuration;   /* Sub-step 3 of deceleration phase */
 
     // Jerk (J) to be used by the trajectory calculator to integrate (step by step) the target position.
     // J = DeltaTheta/(12 * A * A * A)  => DeltaTheta = final position and A = Sub-Step duration
     pHandle->Jerk = pHandle->AngleStep / (12 * pHandle->SubStepDuration * pHandle->SubStepDuration * pHandle->SubStepDuration);
 
     // Speed cruiser = 2*J*A*A)
-    pHandle->CruiseSpeed = 2 * pHandle->Jerk * pHandle->SubStepDuration * pHandle->SubStepDuration;
+    pHandle->CruiseSpeed = 2 * pHandle->Jerk * pHandle->SubStepDuration * pHandle->SubStepDuration ;
 
     pHandle->ElapseTime = 0.0f;
 
@@ -133,6 +133,57 @@ bool TC_MoveCommand(PosCtrl_Handle_t *pHandle, float startingAngle, float angleS
     RetConfigStatus = true;
 
   }
+  return (RetConfigStatus);
+}
+
+/**
+  * @brief  It configures the trapezoidal distance trajectory.
+  * @param  pHandle: handler of the current instance of the Position Control component.
+  * @param  startingAngle Current mechanical position.
+  * @param  angleStep Target motation angle expressed in radians.
+  * @param  speed Cruising speed expressed in SPEED_UNIT (most likely RPM)
+  * @param  rampDuration duration tor each of the ramps expressed in seconds.
+  * @retval true  = Trajectory command programmed
+  *         false = Not ready for a new trajectory configuration.
+  */
+bool TC_DriveCommand(PosCtrl_Handle_t *pHandle, int16_t speed, uint16_t rampDurationms)
+{
+  bool RetConfigStatus = false;
+  
+  // rampDuration is a function of the speed difference unless it is provided as an override
+  // typically RAMP_SECONDS_PER_ROTATION = 1 / 20, which means 1 second to ramp from 0 to 20 rotations/sec
+  // WARNING: Ramp duration value is rounded to the nearest valid value
+  //          [(DeltaT/9) / SamplingTime]:  shall be an integer value
+  float speedOmegaPerSecond  = speed / ( SPEED_UNIT / ( 2.0f * (float) M_PI) );
+  pHandle->RampDuration = (speedOmegaPerSecond  - pHandle->Omega) * RAMP_SECONDS_PER_ROTATION;    
+  if (pHandle->RampDuration < 0) pHandle->RampDuration = -pHandle->RampDuration;
+  if ((float) rampDurationms / 1000.0f > pHandle->RampDuration) pHandle->RampDuration = (float) rampDurationms / 1000.0f;
+  float fMinimumStepDuration = (3.0f * pHandle->SamplingTime);
+  pHandle->RampDuration = (float)((int)(pHandle->RampDuration / fMinimumStepDuration)) * fMinimumStepDuration;
+
+  // SubStepDuration = ramDuration / 3
+  pHandle->SubStepDuration = pHandle->RampDuration / 3.0f;
+  
+  // J = speed_diff / (2 * A * A)
+  pHandle->Jerk = (speedOmegaPerSecond  - pHandle->Omega) / (2 * pHandle->SubStepDuration * pHandle->SubStepDuration);
+  pHandle->CruiseSpeed = speedOmegaPerSecond;
+
+  // Sub step of acceleration phase
+  pHandle->SubStep[0] = 1 * pHandle->SubStepDuration;   /* Sub-step 1 of acceleration phase */
+  pHandle->SubStep[1] = 2 * pHandle->SubStepDuration;   /* Sub-step 2 of acceleration phase */
+  pHandle->SubStep[2] = 3 * pHandle->SubStepDuration;   /* Sub-step 3 of acceleration phase */
+
+  // Start counting the time of the ramp
+  pHandle->ElapseTime = 0.0f;
+  pHandle->Acceleration = 0.0f;
+  
+  pHandle->PositionCtrlStatus = TC_DRIVE_ON_GOING;   /* new drive has been programmed */
+
+  // Enable the position control regulation during DRIVE to ensure more torque is provided if car too heavy
+  pHandle->PositionControlRegulation = ENABLE;
+  
+  RetConfigStatus = true;
+
   return (RetConfigStatus);
 }
 
@@ -195,15 +246,25 @@ void TC_PositionRegulation(PosCtrl_Handle_t *pHandle)
   int32_t wMecAngle;
   int32_t wError;
   int32_t hTorqueRef_Pos;
+  STC_Modality_t bMode = STC_TORQUE_MODE;
 
   if ( pHandle->PositionCtrlStatus == TC_MOVEMENT_ON_GOING )
   {
     TC_MoveExecution(pHandle);
+    bMode = STC_TORQUE_MODE;
+  }
+
+  if ( pHandle->PositionCtrlStatus == TC_DRIVE_ON_GOING )
+  {
+    TC_DriveExecution(pHandle);
+    bMode = pHandle->pSTC->ModeDefault;
+	//bMode = STC_TORQUE_MODE;
   }
   
   if ( pHandle->PositionCtrlStatus == TC_FOLLOWING_ON_GOING )
   {
     TC_FollowExecution(pHandle);
+    bMode = STC_TORQUE_MODE;
   }
   
   if (pHandle->PositionControlRegulation == ENABLE)
@@ -214,7 +275,7 @@ void TC_PositionRegulation(PosCtrl_Handle_t *pHandle)
     wError = wMecAngleRef - wMecAngle;
     hTorqueRef_Pos = PID_Controller(pHandle->PIDPosRegulator, wError);
 
-    STC_SetControlMode( pHandle->pSTC, STC_TORQUE_MODE );
+    STC_SetControlMode( pHandle->pSTC, bMode );
     STC_ExecRamp( pHandle->pSTC, hTorqueRef_Pos, 0 );
   }
 
@@ -279,6 +340,51 @@ void TC_MoveExecution(PosCtrl_Handle_t *pHandle)
       // Ramp is used to search the zero index, if completed there is no z signal
       pHandle->AlignmentStatus = TC_ALIGNMENT_ERROR;
     }
+    pHandle->ElapseTime = 0;
+    pHandle->PositionCtrlStatus = TC_READY_FOR_COMMAND;
+  }
+}
+
+/**
+  * @brief  It executes the programmed drive movement.
+  * @param  pHandle: handler of the current instance of the Position Control component.
+  * @retval none
+  */
+void TC_DriveExecution(PosCtrl_Handle_t *pHandle)
+{
+  float jerkApplied = 0;
+
+  if (pHandle->ElapseTime < pHandle->SubStep[0])              // 1st Sub-Step interval time of acceleration phase
+  {
+    jerkApplied = pHandle->Jerk;
+  }
+  else if (pHandle->ElapseTime < pHandle->SubStep[1])         // 2nd Sub-Step interval time of acceleration phase
+  {
+  }
+  else if (pHandle->ElapseTime < pHandle->SubStep[2])         // 3rd Sub-Step interval time of acceleration phase
+  {
+    jerkApplied = -(pHandle->Jerk);
+  }
+  else                                                           // Speed Cruise phase (after acceleration)
+  {
+    pHandle->Acceleration = 0.0f;
+    pHandle->Omega = pHandle->CruiseSpeed;
+    
+    if (pHandle->CruiseSpeed == 0)
+    {
+      pHandle->PositionCtrlStatus = TC_TARGET_POSITION_REACHED;
+    }
+  }
+
+  if ( pHandle->PositionCtrlStatus == TC_DRIVE_ON_GOING )
+  {
+    pHandle->Acceleration += jerkApplied * pHandle->SamplingTime;
+    pHandle->Omega += pHandle->Acceleration * pHandle->SamplingTime;
+    pHandle->Theta += pHandle->Omega * pHandle->SamplingTime;
+    pHandle->ElapseTime += pHandle->SamplingTime;
+  }
+  else
+  {
     pHandle->ElapseTime = 0;
     pHandle->PositionCtrlStatus = TC_READY_FOR_COMMAND;
   }
@@ -362,6 +468,16 @@ void TC_EncoderReset(PosCtrl_Handle_t *pHandle)
     pHandle->Theta = 0.0f;
     ENC_SetMecAngle(pHandle->pENC , pHandle->MecAngleOffset);
   }
+}
+
+/**
+  * @brief  Returns the reference rotor mechanical angle, expressed in radiant.
+  * @param  pHandle: handler of the current instance of the Position Control component.
+  * @retval current mechanical position
+  */
+float TC_GetPositionRef(PosCtrl_Handle_t *pHandle)
+{
+  return pHandle->Theta;
 }
 
 /**

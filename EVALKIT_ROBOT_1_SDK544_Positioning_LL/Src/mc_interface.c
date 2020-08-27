@@ -164,6 +164,25 @@ __weak void MCI_ExecPositionCommand( MCI_Handle_t * pHandle, float FinalPosition
 }
 
 /**
+  * @brief  This is a buffered command to set a mechanical position of rotor. This commands
+  *         don't become active as soon as it is called but it will be executed
+  *         when the pSTM state is START_RUN or RUN. User can check the status
+  *         of the command calling the MCI_IsCommandAcknowledged method.
+  * @param  pHandle Pointer on the component instance to work on.
+  * @param  angle is the desired rootation angle. expressed in radians
+  * @param  speed the cruising speed expressed in RPMs.
+  * @param  rampDuration duration tor each of the ramps expressed in seconds.
+  * @retval none.
+  */
+__weak void MCI_ExecDriveCommand( MCI_Handle_t * pHandle, int16_t speed, uint16_t rampDurationms, STC_Modality_t controlMode )
+{
+  pHandle->pFOCVars->bDriveInput = INTERNAL;
+  pHandle->pSTC->ModeDefault = controlMode;
+  TC_DriveCommand(pHandle->pPosCtrl, speed, rampDurationms);
+  pHandle->LastModalitySetByUser = pHandle->pSTC->ModeDefault;
+}
+
+/**
   * @brief  This is a user command used to begin the start-up procedure.
   *         If the state machine is in IDLE state the command is executed
   *         instantaneously otherwise the command is discarded. User must take
@@ -358,6 +377,16 @@ __weak PosCtrlStatus_t  MCI_GetCtrlPositionState( MCI_Handle_t * pHandle )
 __weak AlignStatus_t  MCI_GetAlignmentStatus( MCI_Handle_t * pHandle )
 {
   return TC_GetAlignmentStatus( pHandle->pPosCtrl );
+}
+
+/**
+  * @brief  It returns the reference position of the rotor.
+  * @param  pHandle Pointer on the component instance to work on.
+  * @retval float It returns the reference mechanical angular position of the rotor.
+  */
+__weak float MCI_GetPositionRef( MCI_Handle_t * pHandle )
+{
+  return TC_GetPositionRef( pHandle->pPosCtrl );
 }
 
 /**
@@ -560,6 +589,28 @@ __weak int16_t MCI_GetAvrgMecSpeedUnit( MCI_Handle_t * pHandle )
 __weak int16_t MCI_GetMecSpeedRefUnit( MCI_Handle_t * pHandle )
 {
   return ( STC_GetMecSpeedRefUnit( pHandle->pSTC ) );
+}
+
+/**
+  * @brief  Returns the current mechanical rotor speed reference expressed in the unit defined by #SPEED_UNIT
+  *         
+  * @param  pHandle Pointer on the component instance to work on.
+  *         
+  */
+__weak int16_t MCI_GetTorqueRef( MCI_Handle_t * pHandle )
+{
+  return ( STC_GetTorqueRef( pHandle->pSTC ) );
+}
+
+/**
+  * @brief  Returns the turque and Id reference
+  *         
+  * @param  pHandle Pointer on the component instance to work on.
+  *         
+  */
+ __weak qd_t MCI_GetDefaultIqdref( MCI_Handle_t * pHandle )
+{
+  return ( STC_GetDefaultIqdref( pHandle->pSTC ));
 }
 
 /**

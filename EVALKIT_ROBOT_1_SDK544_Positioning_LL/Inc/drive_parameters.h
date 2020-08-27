@@ -129,9 +129,9 @@
 /**************************    FIRMWARE PROTECTIONS SECTION   *****************/
 #define OV_VOLTAGE_PROT_ENABLING        ENABLE
 #define UV_VOLTAGE_PROT_ENABLING        ENABLE
-#define OV_VOLTAGE_THRESHOLD_V          44 /*!< Over-voltage 
+#define OV_VOLTAGE_THRESHOLD_V          15 /*!< Over-voltage 
                                                          threshold */
-#define UD_VOLTAGE_THRESHOLD_V          28 /*!< Under-voltage 
+#define UD_VOLTAGE_THRESHOLD_V          10 /*!< Under-voltage 
                                                           threshold */
 #if 0
 #define ON_OVER_VOLTAGE                 TURN_OFF_PWM /*!< TURN_OFF_PWM, 

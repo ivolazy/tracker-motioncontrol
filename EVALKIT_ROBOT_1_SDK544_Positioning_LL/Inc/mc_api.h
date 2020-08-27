@@ -53,6 +53,9 @@ void MC_ProgramTorqueRampMotor1( int16_t hFinalTorque, uint16_t hDurationms );
 /* Programs a target position for Motor 1 */
 void MC_ProgramPositionCommandMotor1( float fTargetPosition, float fDuration );
 
+/* Programs a target position for Motor 1 */
+void MC_ProgramDriveCommandMotor1( int16_t speed, uint16_t rampDurationms, STC_Modality_t controlMode );
+
 /* Programs a current reference for Motor 1 */
 void MC_SetCurrentReferenceMotor1( qd_t Iqdref );
 
@@ -85,6 +88,12 @@ int16_t MC_GetImposedDirectionMotor1(void);
 
 /* Returns the current reliability of the speed sensor used for Motor 1 */
 bool MC_GetSpeedSensorReliabilityMotor1(void);
+
+/* Returns the torque reference for Motor 1 */
+int16_t MC_GetTorqueRefMotor1(void) ;
+
+/* Returns the default torque and Id reference for Motor 1  */
+qd_t MC_GetDefaultIqdrefMotor1(void) ;
 
 /* returns the amplitude of the phase current injected in Motor 1 */
 int16_t MC_GetPhaseCurrentAmplitudeMotor1(void);
@@ -143,6 +152,9 @@ PosCtrlStatus_t  MC_GetControlPositionStatusMotor1( void );
 
 /* returns the alignment state of Motor 1 */
 AlignStatus_t  MC_GetAlignmentStatusMotor1( void );
+
+/* returns the reference position of Motor 1. */
+float MC_GetPositionRef1( void );
 
 /* returns the current position of Motor 1. */
 float MC_GetCurrentPosition1( void );
